@@ -16,26 +16,26 @@ Second derivatives of raw market quotes are dominated by noise, so the code does
 
 1. Estimate the forward $F$ from put-call parity, $F = K + e^{rT}(C - P)$.
 2. Take the out-of-the-money option at each strike and invert Black-76 for its implied vol.
-3. Fit a smooth smile to total variance $\sigma^2 T$ as a polynomial (or smoothing spline) in $k = \ln(K/F)$, with a $C^2$ extension beyond the quoted strikes.
+3. Fit a smooth smile to total variance $\sigma^2 T$ as a polynomial (or smoothing spline) in $k = \ln(K/F)$, with a $C^3$ extension beyond the quoted strikes.
 4. Rebuild call prices on a fine strike grid from the smooth smile and take the second difference.
 5. Clip negative density, report the integral before renormalising, then renormalise to 1.
 
 ## Quickstart
 
 ```bash
-uv sync                      # add --extra data for the yfinance loader
+uv sync                      # add --extra data for the yfinance loader (experimental)
 uv run rnd fit examples/spx_like.csv --rate 0.04 --asof 2026-09-28 --spot 5500 --plot out.png
 ```
 
 ```
 Forward                 5,537.07
 ATM implied vol         16.93%
-Integral before renorm  0.9985
-Mean                    5,541.54
-Std dev                 509.57
-Skewness                -1.284
-Excess kurtosis         3.421
-P(S_T < 0.90 * S0)      10.03%
+Integral before renorm  0.9988
+Mean                    5,540.80
+Std dev                 511.48
+Skewness                -1.303
+Excess kurtosis         3.495
+P(S_T < 0.90 * S0)      10.05%
 P(S_T > 1.10 * S0)      11.08%
 ```
 

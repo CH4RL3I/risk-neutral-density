@@ -25,18 +25,18 @@ class Smile:
 
     Inside the quoted range w is a polynomial (``method="poly"``) or a smoothing spline
     (``method="spline"``); total variance is much closer to polynomial than vol is, and its
-    wings are close to linear. Outside, w continues from the edge as
-    ``w_e + s1 d + s2 tau^2 (d/tau - 1 + e^{-d/tau})`` (d = distance from the edge) with s1, s2
-    the edge slope and curvature. The extension is C^2 (no kink or jump in the implied density
-    at the edge) and its curvature dies out, so w ends up linear in log-strike, the behaviour
-    Lee's moment formula requires of the wings.
+    wings are close to linear. Outside, w continues from the edge (d = distance from the edge)
+    with curvature ``w''(d) = (s2 + (s3 + s2/tau) d) e^{-d/tau}``, where s1, s2, s3 are the
+    edge's first three derivatives. The extension is C^3, so the implied density is continuous
+    and has no kink at the edge, and its curvature dies out, so w ends up linear in log-strike,
+    the behaviour Lee's moment formula requires of the wings.
     """
 
     def __init__(self, k, iv, T, method="poly", degree=5, smoothing=None, tau=0.1):
         k, w = np.asarray(k, float), np.asarray(iv, float) ** 2 * T
         if method == "poly":
             p = Polynomial.fit(k, w, degree)
-            self._core, self._d, self._d2 = p, p.deriv(), p.deriv(2)
+            self._core, self._d, self._d2, self._d3 = p, p.deriv(), p.deriv(2), p.deriv(3)
         elif method == "spline":
             # smoothing budget: quote noise of ~0.3 vol points at the ATM variance level
             if smoothing is None:
@@ -44,6 +44,7 @@ class Smile:
             s = smoothing
             sp = UnivariateSpline(k, w, k=3, s=s)
             self._core, self._d, self._d2 = sp, sp.derivative(), sp.derivative(2)
+            self._d3 = sp.derivative(3)
         else:
             raise ValueError("method must be 'poly' or 'spline'")
         self.k0, self.k1, self.tau, self.T, self.method = k.min(), k.max(), tau, T, method
@@ -51,8 +52,12 @@ class Smile:
     def _extension(self, edge, sign, d):
         """Outward continuation of total variance from ``edge``; sign +1 right, -1 left."""
         w0, s1, s2 = float(self._core(edge)), sign * float(self._d(edge)), float(self._d2(edge))
+        s3 = sign * float(self._d3(edge))
         t = self.tau
-        return w0 + s1 * d + s2 * t * t * (d / t - 1 + np.exp(-d / t))
+        e = np.exp(-d / t)
+        f = t * t * (d / t - 1 + e)  # double integral of e^{-d/t}
+        g = t * t * d - 2 * t**3 + t * t * d * e + 2 * t**3 * e  # double integral of d e^{-d/t}
+        return w0 + s1 * d + s2 * f + (s3 + s2 / t) * g
 
     def __call__(self, k):
         k = np.asarray(k, float)
